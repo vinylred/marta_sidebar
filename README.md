@@ -6,7 +6,9 @@ folders, Finder favorites, and mounted volumes. Clicking an item navigates
 Marta's **active pane** to that folder. The sidebar matches Marta's active theme
 (colors and appearance) and follows the window as you move it.
 
-![places sidebar](docs/screenshot.png)
+A small toolbar at the top gives native **Back / Forward / Up** navigation plus
+**Search** and **Search-in-current-folder**, all wired to Marta's own built-in
+actions.
 
 ---
 

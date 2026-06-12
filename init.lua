@@ -1,11 +1,12 @@
 marta.expose()
 
 plugin {
-    id = "marta.example.sidebar",
+    id = "vinylred.places.sidebar",
     name = "Places Sidebar",
     apiVersion = "2.2",
-    author = "Balaji",
-    email = "balaji@dreamfolks.com"
+    author = "vinylred",
+    email = "vinylrecord@gmail.com",
+    url = "https://github.com/vinylred/marta_sidebar"
 }
 
 local interop = require "libmartasidebar"
