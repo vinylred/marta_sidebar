@@ -1,0 +1,53 @@
+name: Release
+
+# Build a universal plugin zip and attach it to a GitHub Release whenever a
+# version tag (v1.2.3) is pushed. The build uses the vendored Lua headers, so
+# the runner does not need Marta installed.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14   # Apple Silicon runner with recent Xcode
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swiftc --version
+
+      - name: Derive version
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build & package
+        run: |
+          chmod +x build.sh package.sh
+          ./package.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Verify universal binary
+        run: lipo -archs dist/places-sidebar/libmartasidebar.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: places-sidebar-${{ steps.ver.outputs.version }}
+          path: release/*.zip
+
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
+          generate_release_notes: true
