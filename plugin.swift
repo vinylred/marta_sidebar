@@ -193,6 +193,7 @@ final class SidebarViewController: NSViewController {
 
     private var tableView: NSTableView!
     private var scrollView: NSScrollView!
+    private var navControl: NSSegmentedControl?
 
     init(items: [SidebarItem], theme: Theme) {
         self.items = items
@@ -257,10 +258,10 @@ final class SidebarViewController: NSViewController {
         container.addSubview(scroll)
 
         NSLayoutConstraint.activate([
-            toolbar.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
-            toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            toolbar.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
-            toolbar.heightAnchor.constraint(equalToConstant: 24),
+            toolbar.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+            toolbar.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -10),
+            toolbar.heightAnchor.constraint(equalToConstant: 28),
 
             scroll.topAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: 6),
             scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
@@ -275,39 +276,79 @@ final class SidebarViewController: NSViewController {
         let stack = NSStackView()
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .horizontal
-        stack.spacing = 2
+        stack.spacing = 8
         stack.alignment = .centerY
 
-        func button(symbol: String, fallback: String, tip: String, sel: Selector) -> NSButton {
-            let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
-            let b = NSButton(title: image == nil ? fallback : "", image: image ?? NSImage(),
-                             target: self, action: sel)
-            b.isBordered = false
-            b.bezelStyle = .regularSquare
-            b.imagePosition = image == nil ? .noImage : .imageOnly
-            b.contentTintColor = theme.text
-            b.toolTip = tip
+        func symbol(_ name: String) -> NSImage? {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+            return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                .withSymbolConfiguration(cfg)
+        }
+
+        // Back / Forward as a segmented control — the same control Finder and
+        // Safari use for their navigation arrows. This is the native look.
+        let nav = NSSegmentedControl()
+        nav.translatesAutoresizingMaskIntoConstraints = false
+        nav.segmentStyle = .separated
+        nav.trackingMode = .momentary
+        nav.segmentCount = 2
+        nav.setImage(symbol("chevron.backward"), forSegment: 0)
+        nav.setImage(symbol("chevron.forward"), forSegment: 1)
+        nav.setWidth(34, forSegment: 0)
+        nav.setWidth(34, forSegment: 1)
+        nav.setToolTip("Back (previously visited folder)", forSegment: 0)
+        nav.setToolTip("Forward", forSegment: 1)
+        nav.target = self
+        nav.action = #selector(navSegmentClicked(_:))
+        self.navControl = nav
+
+        // Single bordered toolbar-style buttons (native toolbar bezel).
+        func toolbarButton(_ symbolName: String, tip: String, sel: Selector) -> NSButton {
+            let b = NSButton()
             b.translatesAutoresizingMaskIntoConstraints = false
-            b.widthAnchor.constraint(equalToConstant: 26).isActive = true
-            b.heightAnchor.constraint(equalToConstant: 22).isActive = true
+            b.bezelStyle = .toolbar
+            b.isBordered = true
+            b.image = symbol(symbolName)
+            b.imagePosition = .imageOnly
+            b.toolTip = tip
+            b.target = self
+            b.action = sel
+            b.widthAnchor.constraint(equalToConstant: 34).isActive = true
             return b
         }
 
-        stack.addArrangedSubview(button(symbol: "chevron.backward", fallback: "‹",
-                                        tip: "Back (previously visited folder)",
-                                        sel: #selector(backClicked)))
-        stack.addArrangedSubview(button(symbol: "chevron.forward", fallback: "›",
-                                        tip: "Forward",
-                                        sel: #selector(forwardClicked)))
-        stack.addArrangedSubview(button(symbol: "chevron.up", fallback: "↑",
-                                        tip: "Up (parent folder)",
-                                        sel: #selector(upClicked)))
+        let up = toolbarButton("chevron.up",
+                               tip: "Up (parent folder)",
+                               sel: #selector(upClicked))
+
+        // Search in the current folder (Marta's core.lookup.here popup).
+        let searchHere = toolbarButton("magnifyingglass",
+                                       tip: "Search in current folder",
+                                       sel: #selector(searchHereClicked))
+
+        // Global search / lookup (Marta's core.lookup popup).
+        let search = toolbarButton("text.magnifyingglass",
+                                   tip: "Search",
+                                   sel: #selector(searchClicked))
+
+        stack.addArrangedSubview(nav)
+        stack.addArrangedSubview(up)
+        stack.addArrangedSubview(searchHere)
+        stack.addArrangedSubview(search)
         return stack
     }
 
-    @objc private func backClicked()    { onSelect?("action:core.back") }
-    @objc private func forwardClicked() { onSelect?("action:core.forward") }
-    @objc private func upClicked()       { onSelect?("action:core.go.up") }
+    @objc private func navSegmentClicked(_ sender: NSSegmentedControl) {
+        if sender.selectedSegment == 0 {
+            onSelect?("action:core.back")
+        } else {
+            onSelect?("action:core.forward")
+        }
+    }
+
+    @objc private func upClicked()         { onSelect?("action:core.go.up") }
+    @objc private func searchHereClicked() { onSelect?("action:core.lookup.here") }
+    @objc private func searchClicked()     { onSelect?("action:core.lookup") }
 
     @objc private func rowClicked() {
         emitSelection(row: tableView.clickedRow)
