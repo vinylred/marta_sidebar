@@ -242,10 +242,21 @@ final class SidebarViewController: NSViewController {
         self.scrollView = scroll
 
         container.appearance = NSAppearance(named: theme.isDark ? .darkAqua : .aqua)
+
+        // Navigation toolbar: Back / Forward / Up. These invoke Marta's
+        // built-in actions (core.back/core.forward/core.go.up) via the same
+        // callback used for folders, prefixed with "action:".
+        let toolbar = makeNavigationToolbar()
+        container.addSubview(toolbar)
         container.addSubview(scroll)
 
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            toolbar.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
+            toolbar.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
+            toolbar.heightAnchor.constraint(equalToConstant: 24),
+
+            scroll.topAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: 6),
             scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: container.trailingAnchor),
@@ -253,6 +264,44 @@ final class SidebarViewController: NSViewController {
 
         self.view = container
     }
+
+    private func makeNavigationToolbar() -> NSView {
+        let stack = NSStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .horizontal
+        stack.spacing = 2
+        stack.alignment = .centerY
+
+        func button(symbol: String, fallback: String, tip: String, sel: Selector) -> NSButton {
+            let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+            let b = NSButton(title: image == nil ? fallback : "", image: image ?? NSImage(),
+                             target: self, action: sel)
+            b.isBordered = false
+            b.bezelStyle = .regularSquare
+            b.imagePosition = image == nil ? .noImage : .imageOnly
+            b.contentTintColor = theme.text
+            b.toolTip = tip
+            b.translatesAutoresizingMaskIntoConstraints = false
+            b.widthAnchor.constraint(equalToConstant: 26).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 22).isActive = true
+            return b
+        }
+
+        stack.addArrangedSubview(button(symbol: "chevron.backward", fallback: "‹",
+                                        tip: "Back (previously visited folder)",
+                                        sel: #selector(backClicked)))
+        stack.addArrangedSubview(button(symbol: "chevron.forward", fallback: "›",
+                                        tip: "Forward",
+                                        sel: #selector(forwardClicked)))
+        stack.addArrangedSubview(button(symbol: "chevron.up", fallback: "↑",
+                                        tip: "Up (parent folder)",
+                                        sel: #selector(upClicked)))
+        return stack
+    }
+
+    @objc private func backClicked()    { onSelect?("action:core.back") }
+    @objc private func forwardClicked() { onSelect?("action:core.forward") }
+    @objc private func upClicked()       { onSelect?("action:core.go.up") }
 
     @objc private func rowClicked() {
         emitSelection(row: tableView.clickedRow)

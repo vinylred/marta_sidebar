@@ -107,10 +107,31 @@ action {
         local ok = pcall(function() t = loadTheme() end)
         if not ok then t = {} end
 
-        -- Navigates the active pane to the clicked folder. Invoked from Swift
-        -- on every click.
+        -- Handles a sidebar click. Two kinds of commands arrive here:
+        --   "action:<id>"  -> run a built-in Marta action (Back/Forward/Up)
+        --   "<path>"       -> navigate the active pane to that folder
+        -- Invoked from Swift on every click.
         local function navigate(path)
             if not path then return end
+
+            -- Toolbar buttons: run Marta's own navigation actions by id, so
+            -- "Back" goes to the previously VISITED folder (core.back), not the
+            -- parent. core.go.up is the existing "Up" behavior.
+            local actionId = path:match("^action:(.+)$")
+            if actionId then
+                local act = marta.globalContext.actions:getById(actionId)
+                if not act then
+                    martax.alert("Unknown action: " .. actionId)
+                    return
+                end
+                local ran, aerr = pcall(function()
+                    window:runAction(act)
+                end)
+                if not ran then
+                    martax.alert("Could not run " .. actionId .. "\n" .. tostring(aerr))
+                end
+                return
+            end
 
             -- parsePath -> Path; the file system turns a Path into a File,
             -- which is what model:load expects.

@@ -39,7 +39,7 @@ DIST="$HERE/dist/places-sidebar"
 BUILD="$HERE/build"
 ARCHS=("arm64" "x86_64")
 
-rm -rf "$BUILD"
+rm -rf "$BUILD" "$DIST"
 mkdir -p "$BUILD" "$DIST"
 
 SLICES=()
