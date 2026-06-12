@@ -94,18 +94,25 @@ local function loadTheme()
     }
 end
 
-action {
-    id = "show",
-    name = "Show Places Sidebar",
-    apply = function(context)
-        local window = context.window
-        -- Pass Marta's window so we can dock to its left edge, and a callback
-        -- that navigates the active file pane to the clicked folder.
-        local owner = window and window.nsWindow or nil
+-- Theme is parsed once and reused (it does not change during a session, and
+-- the auto-open handler can fire often).
+local cachedTheme
+local function getTheme()
+    if cachedTheme then return cachedTheme end
+    local t = {}
+    local ok = pcall(function() t = loadTheme() end)
+    cachedTheme = ok and t or {}
+    return cachedTheme
+end
 
-        local t = {}
-        local ok = pcall(function() t = loadTheme() end)
-        if not ok then t = {} end
+-- Opens (or brings forward) the sidebar for the given WindowContext.
+-- Safe to call repeatedly: the native side dedupes by parent window.
+local function openSidebar(window)
+    if not window then return end
+    local owner = window.nsWindow
+    if not owner then return end
+
+    local t = getTheme()
 
         -- Handles a sidebar click. Two kinds of commands arrive here:
         --   "action:<id>"  -> run a built-in Marta action (Back/Forward/Up)
@@ -159,20 +166,54 @@ action {
             end
         end
 
-        -- Argument order MUST match the Swift bridge:
-        --   (nsWindow, callback, appearance, bg, text,
-        --    selection, selectionText, alternate, fontName, fontSize)
-        interop.showSidebar(
-            owner,
-            navigate,
-            t.appearance,
-            t.background,
-            t.text,
-            t.selection,
-            t.selectionText,
-            t.alternate,
-            nil,    -- fontName: use Marta's default (system font)
-            12.5    -- fontSize: Marta's default list font size
-        )
+    -- Argument order MUST match the Swift bridge:
+    --   (nsWindow, callback, appearance, bg, text,
+    --    selection, selectionText, alternate, fontName, fontSize)
+    interop.showSidebar(
+        owner,
+        navigate,
+        t.appearance,
+        t.background,
+        t.text,
+        t.selection,
+        t.selectionText,
+        t.alternate,
+        nil,    -- fontName: use Marta's default (system font)
+        12.5    -- fontSize: Marta's default list font size
+    )
+end
+
+-- Set to false to disable opening the sidebar automatically with Marta.
+local AUTO_OPEN = true
+
+-- Resolves the WindowContext from whatever context object we are handed.
+-- Action callbacks expose context.window; list-model handlers expose
+-- context.activePane.windowContext. Try both.
+local function windowOf(context)
+    if not context then return nil end
+    if context.window then return context.window end
+    local ok, w = pcall(function() return context.activePane.windowContext end)
+    if ok then return w end
+    return nil
+end
+
+-- Manual trigger (Cmd-Shift-P -> "Show Places Sidebar").
+action {
+    id = "show",
+    name = "Show Places Sidebar",
+    apply = function(context)
+        openSidebar(windowOf(context))
     end
 }
+
+-- Auto-open: locationChanged fires when a pane loads a folder, including the
+-- initial load as a window appears at startup. We open the sidebar then, so it
+-- comes up automatically with Marta. The native side dedupes per window, so
+-- subsequent navigations just keep the existing sidebar.
+if AUTO_OPEN then
+    listModelHandler {
+        locationChanged = function(context)
+            pcall(function() openSidebar(windowOf(context)) end)
+        end
+    }
+end

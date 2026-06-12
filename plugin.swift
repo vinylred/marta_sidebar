@@ -209,6 +209,12 @@ final class SidebarViewController: NSViewController {
         // Solid background matching Marta's theme (no system vibrancy, so it
         // does not look lighter/translucent next to the main window).
         container.layer?.backgroundColor = theme.background.cgColor
+        // Round the LEFT corners only, so it reads like a panel attached to
+        // Marta's left edge (right edge stays flush). Matches macOS rounding
+        // instead of a hard-edged borderless rectangle.
+        container.layer?.cornerRadius = 10
+        container.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        container.layer?.masksToBounds = true
 
         let table = NSTableView()
         table.style = .plain                       // plain, so we control colors
@@ -510,9 +516,12 @@ private func showSidebar(ownerWindow: NSWindow?,
                           backing: .buffered,
                           defer: false)
     window.contentViewController = vc
-    window.backgroundColor = theme.background
-    window.isOpaque = true
-    window.hasShadow = false
+    // Clear window background + shadow so the content view's rounded corners
+    // show through (a borderless window is otherwise a hard-edged rectangle,
+    // unlike standard macOS windows).
+    window.backgroundColor = .clear
+    window.isOpaque = false
+    window.hasShadow = true
     window.appearance = NSAppearance(named: theme.isDark ? .darkAqua : .aqua)
     window.collectionBehavior = [.moveToActiveSpace]
 
